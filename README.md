@@ -1,4 +1,4 @@
-# glaudb-rqio
+# GlauDB (rqio package support)
 
 GlauDB SDK for [RayQuiro](https://rayquiro.raytolfas.com) scripting language.
 
