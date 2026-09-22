@@ -1,0 +1,9 @@
+{
+  "name": "glaudb",
+  "version": "0.1.0",
+  "description": "GlauDB driver for RayQuiro — fast embedded database engine with TCP binary protocol",
+  "entry": "glaudb.rq",
+  "author": "Raytolfas",
+  "license": "MIT",
+  "dependencies": {}
+}

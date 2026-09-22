@@ -1,0 +1,255 @@
+var _addr = "127.0.0.1:8081";
+var _auth = "";
+var _cli = "glaudb";
+
+fn connect(addr, auth) {
+    _addr = addr;
+    if (auth != null) {
+        _auth = auth;
+    }
+}
+
+fn set_cli(path) {
+    _cli = path;
+}
+
+fn _exec(cmd, payload_json) {
+    var ts = str(time.unix_ms());
+    var rnd = str(random.int(1000, 9999));
+    var req = "_glaudb_req_" + ts + "_" + rnd + ".json";
+    var res = "_glaudb_res_" + ts + "_" + rnd + ".json";
+
+    fs.write(req, payload_json);
+
+    var auth_flag = "";
+    if (_auth != "") {
+        auth_flag = " -k " + _auth;
+    }
+
+    var cmd_line = _cli + " query -a " + _addr + auth_flag + " -c " + str(cmd) + " -p @" + req + " -o " + res;
+    var code = process.run(cmd_line);
+
+    if (fs.exists(req)) {
+        fs.remove(req);
+    }
+
+    if (code != 0) {
+        if (fs.exists(res)) {
+            fs.remove(res);
+        }
+        return null;
+    }
+
+    var result = null;
+    if (fs.exists(res)) {
+        var raw = fs.read(res);
+        fs.remove(res);
+        if (raw != "") {
+            result = json.parse(raw);
+        }
+    }
+
+    return result;
+}
+
+fn create_collection(name, fields_json) {
+    var payload = "{\"name\":\"" + name + "\",\"fields\":" + fields_json + "}";
+    return _exec(1, payload);
+}
+
+fn delete_collection(name) {
+    var payload = "{\"name\":\"" + name + "\"}";
+    return _exec(2, payload);
+}
+
+fn insert(collection, data_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"data\":" + data_json + "}";
+    return _exec(3, payload);
+}
+
+fn get(collection, id, expand) {
+    var expand_str = "false";
+    if (expand) {
+        expand_str = "true";
+    }
+    var payload = "{\"collection\":\"" + collection + "\",\"id\":\"" + id + "\",\"expand\":" + expand_str + "}";
+    return _exec(4, payload);
+}
+
+fn update(collection, id, data_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"id\":\"" + id + "\",\"data\":" + data_json + "}";
+    return _exec(5, payload);
+}
+
+fn delete(collection, id) {
+    var payload = "{\"collection\":\"" + collection + "\",\"id\":\"" + id + "\"}";
+    return _exec(6, payload);
+}
+
+fn query(collection, filters_json, sort_json, limit, expand) {
+    var expand_str = "false";
+    if (expand) {
+        expand_str = "true";
+    }
+    var limit_str = "null";
+    if (limit > 0) {
+        limit_str = str(limit);
+    }
+    var payload = "{\"collection\":\"" + collection + "\",\"query\":{\"filters\":" + filters_json + ",\"sort\":" + sort_json + ",\"limit\":" + limit_str + "},\"expand\":" + expand_str + "}";
+    return _exec(7, payload);
+}
+
+fn all(collection) {
+    return query(collection, "[]", "[]", 0, false);
+}
+
+fn all_expanded(collection) {
+    return query(collection, "[]", "[]", 0, true);
+}
+
+fn backup(dest_path) {
+    var payload = "{\"dest\":\"" + dest_path + "\"}";
+    return _exec(8, payload);
+}
+
+fn patch(collection, id, data_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"id\":\"" + id + "\",\"data\":" + data_json + "}";
+    return _exec(9, payload);
+}
+
+fn bulk_insert(collection, docs_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"data\":" + docs_json + "}";
+    return _exec(10, payload);
+}
+
+fn bulk_delete(collection, ids_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"ids\":" + ids_json + "}";
+    return _exec(11, payload);
+}
+
+fn search(collection, q, fields_json, limit) {
+    var limit_str = "null";
+    if (limit > 0) {
+        limit_str = str(limit);
+    }
+    var payload = "{\"collection\":\"" + collection + "\",\"q\":\"" + q + "\",\"fields\":" + fields_json + ",\"limit\":" + limit_str + "}";
+    return _exec(12, payload);
+}
+
+fn aggregate(collection, pipeline_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"pipeline\":" + pipeline_json + "}";
+    return _exec(13, payload);
+}
+
+fn count(collection, query_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"query\":" + query_json + "}";
+    return _exec(14, payload);
+}
+
+fn upsert(collection, match_field, data_json) {
+    var payload = "{\"collection\":\"" + collection + "\",\"match_field\":\"" + match_field + "\",\"data\":" + data_json + "}";
+    return _exec(15, payload);
+}
+
+fn find_one(collection, filters_json, sort_json) {
+    var sort = sort_json;
+    if (sort == null) {
+        sort = "[]";
+    }
+    var payload = "{\"collection\":\"" + collection + "\",\"query\":{\"filters\":" + filters_json + ",\"sort\":" + sort + ",\"limit\":1,\"offset\":null}}";
+    return _exec(16, payload);
+}
+
+fn exists(collection, filters_json) {
+    var result = find_one(collection, filters_json, null);
+    return result != null;
+}
+
+fn find_by(collection, field, value_json) {
+    var filters = "[{\"field\":\"" + field + "\",\"op\":\"eq\",\"value\":" + value_json + "}]";
+    return find_one(collection, filters, null);
+}
+
+fn query_where(collection, field, op, value_json, limit) {
+    var filters = "[{\"field\":\"" + field + "\",\"op\":\"" + op + "\",\"value\":" + value_json + "}]";
+    return query(collection, filters, "[]", limit, false);
+}
+
+fn query_in(collection, field, values_json, limit) {
+    return query_where(collection, field, "in", values_json, limit);
+}
+
+fn query_starts_with(collection, field, prefix, limit) {
+    return query_where(collection, field, "startswith", "\"" + prefix + "\"", limit);
+}
+
+fn paginate(collection, filters_json, sort_json, page, page_size) {
+    var offset = (page - 1) * page_size;
+    var payload = "{\"collection\":\"" + collection + "\",\"query\":{\"filters\":" + filters_json + ",\"sort\":" + sort_json + ",\"limit\":" + str(page_size) + ",\"offset\":" + str(offset) + "}}";
+    return _exec(7, payload);
+}
+
+fn _build_filter(field, op, val_json) {
+    return "{\"field\":\"" + field + "\",\"op\":\"" + op + "\",\"value\":" + val_json + "}";
+}
+
+fn _build_sort(field, desc) {
+    var desc_str = "false";
+    if (desc) {
+        desc_str = "true";
+    }
+    return "{\"field\":\"" + field + "\",\"desc\":" + desc_str + "}";
+}
+
+fn new_query(collection) {
+    return {
+        "_col": collection,
+        "_filters": [],
+        "_sort": [],
+        "_limit": 0,
+        "_offset": 0,
+        "_expand": false
+    };
+}
+
+fn qb_where(qb, field, op, val_json) {
+    qb._filters = qb._filters + [_build_filter(field, op, val_json)];
+    return qb;
+}
+
+fn qb_eq(qb, field, val_json) { return qb_where(qb, field, "eq", val_json); }
+fn qb_neq(qb, field, val_json) { return qb_where(qb, field, "neq", val_json); }
+fn qb_gt(qb, field, val_json) { return qb_where(qb, field, "gt", val_json); }
+fn qb_lt(qb, field, val_json) { return qb_where(qb, field, "lt", val_json); }
+fn qb_gte(qb, field, val_json) { return qb_where(qb, field, "gte", val_json); }
+fn qb_lte(qb, field, val_json) { return qb_where(qb, field, "lte", val_json); }
+fn qb_in(qb, field, vals_json) { return qb_where(qb, field, "in", vals_json); }
+fn qb_contains(qb, field, val) { return qb_where(qb, field, "contains", "\"" + val + "\""); }
+fn qb_starts(qb, field, prefix) { return qb_where(qb, field, "startswith", "\"" + prefix + "\""); }
+
+fn qb_sort(qb, field, desc) {
+    qb._sort = qb._sort + [_build_sort(field, desc)];
+    return qb;
+}
+
+fn qb_limit(qb, n) { qb._limit = n; return qb; }
+fn qb_offset(qb, n) { qb._offset = n; return qb; }
+fn qb_expand(qb) { qb._expand = true; return qb; }
+
+fn qb_run(qb) {
+    var filters_str = json.stringify(qb._filters);
+    var sort_str = json.stringify(qb._sort);
+    return query(qb._col, filters_str, sort_str, qb._limit, qb._expand);
+}
+
+fn qb_first(qb) {
+    var filters_str = json.stringify(qb._filters);
+    var sort_str = json.stringify(qb._sort);
+    return find_one(qb._col, filters_str, sort_str);
+}
+
+fn qb_count(qb) {
+    var filters_str = json.stringify(qb._filters);
+    var q = "{\"filters\":" + filters_str + ",\"sort\":[],\"limit\":null,\"offset\":null}";
+    return count(qb._col, q);
+}
